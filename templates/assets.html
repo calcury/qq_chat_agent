@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>素材数据库管理</title>
+    <link
+      href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.3.4/vue.global.prod.js"></script>
+    <style>
+      body {
+        background-color: #f4f7f6;
+      }
+      .db-card {
+        transition: transform 0.2s;
+        cursor: pointer;
+      }
+      .db-card:hover {
+        transform: translateY(-5px);
+      }
+      .asset-item {
+        background: #fff;
+        border-left: 4px solid #0d6efd;
+      }
+      [v-cloak] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    {% raw %}
+    <div id="app" class="container py-5" v-cloak>
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="fw-bold">素材数据库管理</h2>
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item"><a href="/">主面板</a></li>
+              <li class="breadcrumb-item active">数据库管理</li>
+            </ol>
+          </nav>
+        </div>
+        <button class="btn btn-dark shadow-sm" @click="saveAll">
+          保存修改
+        </button>
+      </div>
+
+      <div class="row">
+        <!-- 左侧数据库列表 -->
+        <div class="col-md-4">
+          <div class="card shadow-sm border-0 mb-4">
+            <div
+              class="card-header bg-white py-3 d-flex justify-content-between"
+            >
+              <span class="fw-bold">数据库清单</span>
+              <button class="btn btn-sm btn-primary" @click="createDB">
+                + 新建
+              </button>
+            </div>
+            <div class="list-group list-group-flush">
+              <div
+                v-for="(items, dbName) in db"
+                :key="dbName"
+                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                :class="{active: currentDB === dbName}"
+                @click="currentDB = dbName"
+              >
+                <span>{{ dbName }}</span>
+                <span class="badge rounded-pill bg-secondary"
+                  >{{ items.length }}</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧数据项编辑 -->
+        <div class="col-md-8">
+          <div v-if="currentDB" class="card shadow-sm border-0">
+            <div
+              class="card-header bg-white py-3 d-flex justify-content-between align-items-center"
+            >
+              <h5 class="m-0 fw-bold text-primary">📍 {{ currentDB }}</h5>
+              <div>
+                <button
+                  class="btn btn-sm btn-outline-danger me-2"
+                  @click="deleteDB"
+                >
+                  删除库
+                </button>
+                <button class="btn btn-sm btn-success" @click="addItem">
+                  + 添加条目
+                </button>
+              </div>
+            </div>
+            <div class="card-body bg-light">
+              <div
+                v-for="(item, index) in db[currentDB]"
+                :key="index"
+                class="asset-item p-3 mb-3 shadow-sm rounded"
+              >
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="small text-muted">描述</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      v-model="item.desc"
+                      placeholder="例: 欢迎图片"
+                    />
+                  </div>
+                  <div class="col-md-3">
+                    <label class="small text-muted">类型</label>
+                    <select
+                      class="form-select form-select-sm"
+                      v-model="item.type"
+                    >
+                      <option value="image">图片 (Image)</option>
+                      <option value="file">文件 (File)</option>
+                      <option value="video">视频 (Video)</option>
+                      <option value="text">文本 (Text)</option>
+                      <option value="link">链接 (Link)</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="small text-muted">路径/URL/CQ码</label>
+                    <!-- 修改点：如果是 text 类型，使用 textarea，否则使用 input -->
+                    <textarea
+                      v-if="item.type === 'text'"
+                      class="form-control form-control-sm"
+                      v-model="item.path"
+                      rows="3"
+                      placeholder="在这里输入文字，支持直接回车换行"
+                    >
+                    </textarea>
+                    <input
+                      v-else
+                      type="text"
+                      class="form-control form-control-sm"
+                      v-model="item.path"
+                      placeholder="path or url"
+                    />
+                  </div>
+                  <div class="col-md-1 d-flex align-items-end">
+                    <button
+                      class="btn btn-sm btn-outline-danger border-0"
+                      @click="removeItem(index)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="db[currentDB].length === 0"
+                class="text-center py-5 text-muted"
+              >
+                暂无数据，点击“添加条目”开始
+              </div>
+            </div>
+          </div>
+          <div
+            v-else
+            class="card shadow-sm border-0 d-flex justify-content-center align-items-center text-muted"
+            style="height: 200px"
+          >
+            请在左侧选择或创建一个数据库
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endraw %}
+
+    <script>
+      const { createApp } = Vue;
+      createApp({
+        data() {
+          return {
+            db: {},
+            currentDB: null,
+          };
+        },
+        mounted() {
+          this.fetchAssets();
+        },
+        methods: {
+          async fetchAssets() {
+            const res = await fetch("/api/assets");
+            this.db = await res.json();
+          },
+          async saveAll() {
+            await fetch("/api/assets", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(this.db),
+            });
+            alert("数据库已同步到硬盘");
+          },
+          createDB() {
+            const name = prompt("请输入新数据库名称:");
+            if (name && !this.db[name]) {
+              this.db[name] = [];
+              this.currentDB = name;
+            }
+          },
+          deleteDB() {
+            if (confirm(`确定要彻底删除数据库 [${this.currentDB}] 吗？`)) {
+              delete this.db[this.currentDB];
+              this.currentDB = null;
+            }
+          },
+          addItem() {
+            this.db[this.currentDB].push({ desc: "", type: "image", path: "" });
+          },
+          removeItem(index) {
+            this.db[this.currentDB].splice(index, 1);
+          },
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

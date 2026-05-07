@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QQ Bot 后台管理</title>
+    <link
+      href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.bootcdn.net/ajax/libs/vue/3.3.4/vue.global.prod.js"></script>
+    <style>
+      .form-switch .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        cursor: pointer;
+      }
+      .card {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        border: none;
+      }
+      body {
+        background-color: #f8f9fa;
+        font-family:
+          "Segoe UI",
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      [v-cloak] {
+        display: none;
+      }
+      .badge-ai {
+        background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+      }
+      .badge-agent {
+        background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+      }
+      .badge-asset {
+        background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+      }
+      .modal-header {
+        background-color: #fff;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .agent-box {
+        border-left: 4px solid #f5576c;
+        padding-left: 15px;
+        margin-top: 10px;
+      }
+      .asset-box {
+        border-left: 4px solid #11998e;
+        padding-left: 15px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    {% raw %}
+    <div id="app" class="container py-5" v-cloak>
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="mb-0">Bot Management Panel</h2>
+          <p class="text-muted small">GLM-4-Flash 智能代理模式已启用</p>
+        </div>
+        <button
+          class="btn btn-success px-4"
+          @click="saveAll"
+          :disabled="isSaving"
+        >
+          {{ isSaving ? '保存中...' : '保存所有修改' }}
+        </button>
+      </div>
+
+      <div class="row">
+        <div class="col-lg-7">
+          <div class="card">
+            <div
+              class="card-header d-flex justify-content-between align-items-center bg-white"
+            >
+              <span class="fw-bold">账户管理</span>
+              <button class="btn btn-sm btn-primary" @click="addAccount">
+                + 添加账号
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-3">ID (群/QQ)</th>
+                    <th>备注描述</th>
+                    <th>总开关</th>
+                    <th>AI 策略</th>
+                    <th class="text-end pe-3">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(cfg, id) in config.accounts" :key="id">
+                    <td class="ps-3 fw-bold">{{ id }}</td>
+                    <td>
+                      <small class="text-muted"
+                        >{{ cfg.description || '—' }}</small
+                      >
+                    </td>
+                    <td>
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          v-model="cfg.enabled"
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <template v-if="cfg.ai_enabled || cfg.assets_enabled">
+                        <div class="d-flex flex-wrap gap-1">
+                          <span v-if="cfg.ai_enabled" class="badge badge-ai"
+                            >对话开启</span
+                          >
+                          <span
+                            v-if="cfg.assets_enabled"
+                            class="badge badge-asset"
+                            >素材库开启</span
+                          >
+                          <span
+                            v-if="cfg.reply_mode === 'agent'"
+                            class="badge badge-agent"
+                            >Agent</span
+                          >
+                        </div>
+                      </template>
+                      <span v-else class="badge bg-light text-muted border"
+                        >关键词模式</span
+                      >
+                    </td>
+                    <td class="text-end pe-3">
+                      <button
+                        class="btn btn-sm btn-outline-primary me-2"
+                        @click="editAccount(id)"
+                      >
+                        配置面板
+                      </button>
+                      <button
+                        class="btn btn-sm text-danger"
+                        @click="delAccount(id)"
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card">
+            <div
+              class="card-header d-flex justify-content-between align-items-center bg-white"
+            >
+              <span class="fw-bold">关键词库 (Content)</span>
+              <button class="btn btn-sm btn-primary" @click="addGroup">
+                + 新建组
+              </button>
+            </div>
+            <div class="card-body">
+              <div
+                v-for="(data, gname) in config.content"
+                :key="gname"
+                class="border rounded p-3 mb-3"
+              >
+                <div class="d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0">📂 {{ gname }}</h6>
+                  <div>
+                    <button
+                      class="btn btn-sm btn-link text-decoration-none"
+                      @click="editGroup(gname)"
+                    >
+                      编辑内容
+                    </button>
+                    <button
+                      class="btn btn-sm btn-link text-danger text-decoration-none"
+                      @click="delGroup(gname)"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="accModal" tabindex="-1">
+        <div class="modal-dialog modal-md">
+          <div class="modal-content" v-if="editingAcc">
+            <div class="modal-header">
+              <h5 class="modal-title">账户配置: {{ editingAccId }}</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-4 p-3 rounded bg-white border">
+                <label class="form-label fw-bold small text-primary"
+                  >📝 账户备注描述</label
+                >
+                <input
+                  type="text"
+                  class="form-control form-control-sm"
+                  v-model="editingAcc.description"
+                  placeholder="请输入此账号的备注，如：XX测试群"
+                />
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label fw-bold small"
+                  >1. 启用的关键词组</label
+                >
+                <div
+                  class="list-group list-group-flush border rounded"
+                  style="max-height: 120px; overflow-y: auto"
+                >
+                  <label
+                    v-for="(v, gname) in config.content"
+                    :key="gname"
+                    class="list-group-item py-1"
+                  >
+                    <input
+                      class="form-check-input me-2"
+                      type="checkbox"
+                      :value="gname"
+                      v-model="editingAcc.groups"
+                    />
+                    <span class="small">{{ gname }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div
+                class="p-3 rounded bg-white border mb-4"
+                style="border-left: 4px solid #11998e !important"
+              >
+                <div
+                  class="d-flex justify-content-between align-items-center mb-2"
+                >
+                  <label class="form-label fw-bold mb-0"
+                    >📚 AI 素材库调度能力</label
+                  >
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      v-model="editingAcc.assets_enabled"
+                    />
+                  </div>
+                </div>
+
+                <div v-if="editingAcc.assets_enabled" class="mt-3">
+                  <label class="form-label small fw-bold text-muted"
+                    >素材库触发模式</label
+                  >
+                  <div class="mb-3">
+                    <div class="form-check form-check-inline">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        value="at"
+                        v-model="editingAcc.asset_reply_mode"
+                      />
+                      <label class="form-check-label small">@时检索</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        value="always"
+                        v-model="editingAcc.asset_reply_mode"
+                      />
+                      <label class="form-check-label small">始终监控</label>
+                    </div>
+                  </div>
+
+                  <label class="form-label small fw-bold text-muted"
+                    >选择调度的素材库</label
+                  >
+                  <div
+                    class="list-group border rounded mb-2"
+                    style="max-height: 120px; overflow-y: auto"
+                  >
+                    <label
+                      v-for="(content, assetName) in allAssets"
+                      :key="assetName"
+                      class="list-group-item py-1"
+                    >
+                      <input
+                        class="form-check-input me-2"
+                        type="checkbox"
+                        :value="assetName"
+                        v-model="editingAcc.selected_assets"
+                      />
+                      <span class="small">{{ assetName }}</span>
+                    </label>
+                    <div
+                      v-if="Object.keys(allAssets).length === 0"
+                      class="p-2 text-center text-muted small"
+                    >
+                      无素材库数据
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3 rounded bg-light border">
+                <div
+                  class="d-flex justify-content-between align-items-center mb-2"
+                >
+                  <label class="form-label fw-bold mb-0"
+                    >✨ AI 智能对话能力</label
+                  >
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      v-model="editingAcc.ai_enabled"
+                    />
+                  </div>
+                </div>
+
+                <div v-if="editingAcc.ai_enabled" class="mt-3">
+                  <label class="form-label small fw-bold">回复模式</label>
+                  <div class="mb-3">
+                    <div class="form-check form-check-inline">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        value="at"
+                        v-model="editingAcc.reply_mode"
+                      />
+                      <label class="form-check-label small">@时回复</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        value="always"
+                        v-model="editingAcc.reply_mode"
+                      />
+                      <label class="form-check-label small">总是回复</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        value="agent"
+                        v-model="editingAcc.reply_mode"
+                      />
+                      <label class="form-check-label small">Agent 判断</label>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="editingAcc.reply_mode === 'agent'"
+                    class="agent-box mb-3"
+                  >
+                    <label class="form-label small fw-bold text-danger"
+                      >Agent 判断准则:</label
+                    >
+                    <textarea
+                      class="form-control form-control-sm"
+                      rows="2"
+                      v-model="editingAcc.agent_condition"
+                      placeholder="输入回复要求"
+                    ></textarea>
+                  </div>
+
+                  <label class="form-label small fw-bold"
+                    >AI 人设提示词 (Roleplay):</label
+                  >
+                  <textarea
+                    class="form-control form-control-sm"
+                    rows="3"
+                    v-model="editingAcc.ai_prompt"
+                    placeholder="例如：你是一个助手。"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-primary w-100"
+                data-bs-dismiss="modal"
+              >
+                确认配置
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="groupModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content" v-if="editingGroup">
+            <div class="modal-header">
+              <h5 class="modal-title">编辑组内容: {{ editingGroupName }}</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <div class="input-group mb-3">
+                <input
+                  type="text"
+                  v-model="newKey"
+                  class="form-control"
+                  placeholder="关键词"
+                />
+                <input
+                  type="text"
+                  v-model="newVal"
+                  class="form-control"
+                  placeholder="回复内容"
+                />
+                <button class="btn btn-primary" @click="addReply">添加</button>
+              </div>
+              <div class="table-responsive" style="max-height: 400px">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>关键词</th>
+                      <th>回复内容</th>
+                      <th class="text-end">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(val, key) in editingGroup.replies" :key="key">
+                      <td><code>{{ key }}</code></td>
+                      <td>{{ val }}</td>
+                      <td class="text-end">
+                        <button
+                          class="btn btn-sm text-danger"
+                          @click="delReply(key)"
+                        >
+                          删除
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endraw %}
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      const { createApp } = Vue;
+      createApp({
+        data() {
+          return {
+            config: { accounts: {}, content: {} },
+            allAssets: {},
+            editingAccId: null,
+            editingAcc: null,
+            editingGroupName: null,
+            editingGroup: null,
+            newKey: "",
+            newVal: "",
+            isSaving: false,
+          };
+        },
+        mounted() {
+          this.fetchConfig();
+        },
+        methods: {
+          async fetchConfig() {
+            const res = await fetch("/api/config");
+            const data = await res.json();
+
+            try {
+              const assetRes = await fetch("/api/assets");
+              this.allAssets = await assetRes.json();
+            } catch (e) {
+              console.log("Assets loaded failed");
+            }
+
+            Object.keys(data.accounts).forEach((id) => {
+              const acc = data.accounts[id];
+              // 兼容旧数据，初始化描述字段
+              if (acc.description === undefined) acc.description = "";
+              if (!acc.reply_mode) acc.reply_mode = "at";
+              if (!acc.agent_condition) acc.agent_condition = "";
+              if (acc.assets_enabled === undefined) acc.assets_enabled = false;
+              if (!acc.asset_reply_mode) acc.asset_reply_mode = "at";
+              if (!acc.selected_assets) acc.selected_assets = [];
+            });
+            this.config = data;
+          },
+          async saveAll() {
+            this.isSaving = true;
+            try {
+              const h = { "Content-Type": "application/json" };
+              await fetch("/api/accounts", {
+                method: "POST",
+                headers: h,
+                body: JSON.stringify(this.config.accounts),
+              });
+              await fetch("/api/content", {
+                method: "POST",
+                headers: h,
+                body: JSON.stringify(this.config.content),
+              });
+              alert("配置已全局同步并保存！");
+            } catch (e) {
+              alert("保存失败，请检查网络");
+            }
+            this.isSaving = false;
+          },
+          addAccount() {
+            const id = prompt("请输入群号或QQ号:");
+            if (id) {
+              this.config.accounts[id] = {
+                enabled: true,
+                description: "", // 初始化新账号描述
+                ai_enabled: false,
+                reply_mode: "at",
+                agent_condition: "",
+                ai_prompt: "",
+                groups: [],
+                assets_enabled: false,
+                asset_reply_mode: "at",
+                selected_assets: [],
+              };
+            }
+          },
+          delAccount(id) {
+            if (confirm("确定要删除该账号的所有配置吗?"))
+              delete this.config.accounts[id];
+          },
+          editAccount(id) {
+            this.editingAccId = id;
+            this.editingAcc = this.config.accounts[id];
+            if (!this.editingAcc.reply_mode) this.editingAcc.reply_mode = "at";
+            if (!this.editingAcc.asset_reply_mode)
+              this.editingAcc.asset_reply_mode = "at";
+            if (!this.editingAcc.selected_assets)
+              this.editingAcc.selected_assets = [];
+
+            new bootstrap.Modal(document.getElementById("accModal")).show();
+          },
+          addGroup() {
+            const n = prompt("请输入新组名:");
+            if (n) this.config.content[n] = { replies: {} };
+          },
+          delGroup(n) {
+            if (confirm("确定删除该关键词组?")) delete this.config.content[n];
+          },
+          editGroup(n) {
+            this.editingGroupName = n;
+            this.editingGroup = this.config.content[n];
+            new bootstrap.Modal(document.getElementById("groupModal")).show();
+          },
+          addReply() {
+            if (this.newKey && this.newVal) {
+              this.editingGroup.replies[this.newKey] = this.newVal;
+              this.newKey = "";
+              this.newVal = "";
+            }
+          },
+          delReply(k) {
+            delete this.editingGroup.replies[k];
+          },
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>
